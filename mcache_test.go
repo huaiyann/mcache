@@ -1,4 +1,4 @@
-package mcahce
+package mcache
 
 import (
 	"fmt"
