@@ -4,12 +4,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/huaiyann/mcache/expire"
+	"github.com/huaiyann/mcache/internal/expire"
 )
 
-type MCache struct {
-	expires *expire.Expire
-	m       *sync.Map
+type cacheItemWithExpire interface {
+	GetExipireAt() time.Time
 }
 
 func New() *MCache {
@@ -21,37 +20,17 @@ func New() *MCache {
 	return mc
 }
 
-type cacheItem struct {
-	key      string
-	value    string
-	expireAt time.Time
+func Raw[T comparable](cache *MCache) RawValuer[T] {
+	return RawValuer[T]{cache: cache}
 }
 
-func (mc *MCache) Set(key string, value []byte, ttl time.Duration) {
-	item := cacheItem{
-		key:   key,
-		value: string(value),
-	}
-	if ttl > 0 {
-		item.expireAt = time.Now().Add(ttl)
-	} else {
-		item.expireAt = time.Now().Add(time.Hour * 24 * 365 * 200)
-	}
-	mc.m.Store(key, item)
-	mc.expires.Add(key, item.expireAt)
+func Json[T any](cache *MCache) JsonValuer[T] {
+	return JsonValuer[T]{keyer: Raw[string](cache)}
 }
 
-func (mc *MCache) Get(key string) ([]byte, bool) {
-	data, ok := mc.m.Load(key)
-	if !ok {
-		return nil, false
-	}
-	item := data.(cacheItem)
-	if time.Now().After(item.expireAt) {
-		mc.m.CompareAndDelete(key, data)
-		return nil, false
-	}
-	return []byte(item.value), true
+type MCache struct {
+	expires *expire.Expire
+	m       *sync.Map
 }
 
 func (mc *MCache) doExpire() {
@@ -60,9 +39,19 @@ func (mc *MCache) doExpire() {
 		if !ok {
 			continue
 		}
-		item := data.(cacheItem)
-		if time.Now().After(item.expireAt) {
+		item := data.(cacheItemWithExpire)
+		if time.Now().After(item.GetExipireAt()) {
 			mc.m.CompareAndDelete(key, data)
 		}
 	}
+}
+
+type cacheItem[T comparable] struct {
+	key      string
+	value    T
+	expireAt time.Time
+}
+
+func (c cacheItem[T]) GetExipireAt() time.Time {
+	return c.expireAt
 }
