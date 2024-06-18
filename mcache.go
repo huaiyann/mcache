@@ -26,7 +26,7 @@ func Raw[T comparable](cache *MCache) RawValuer[T] {
 }
 
 func Json[T any](cache *MCache) JsonValuer[T] {
-	return JsonValuer[T]{keyer: Raw[string](cache)}
+	return JsonValuer[T]{valuer: Raw[string](cache)}
 }
 
 func Protobuf[T proto.Message](cache *MCache) ProtobufValuer[T] {

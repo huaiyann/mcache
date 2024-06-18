@@ -13,7 +13,7 @@ type RawValuer[T comparable] struct {
 	cache *MCache
 }
 
-func (k RawValuer[T]) Set(key string, data T, ttl time.Duration) error {
+func (v RawValuer[T]) Set(key string, data T, ttl time.Duration) error {
 	item := cacheItem[T]{
 		key:   key,
 		value: data,
@@ -23,40 +23,40 @@ func (k RawValuer[T]) Set(key string, data T, ttl time.Duration) error {
 	} else {
 		item.expireAt = time.Now().Add(time.Hour * 24 * 365 * 200)
 	}
-	k.cache.m.Store(key, item)
-	k.cache.expires.Add(key, item.expireAt)
+	v.cache.m.Store(key, item)
+	v.cache.expires.Add(key, item.expireAt)
 	return nil
 }
 
-func (k RawValuer[T]) Get(key string) (T, bool) {
+func (v RawValuer[T]) Get(key string) (T, bool) {
 	var null T
-	data, ok := k.cache.m.Load(key)
+	data, ok := v.cache.m.Load(key)
 	if !ok {
 		return null, false
 	}
 	item := data.(cacheItem[T])
 	if time.Now().After(item.expireAt) {
-		k.cache.m.CompareAndDelete(key, data)
+		v.cache.m.CompareAndDelete(key, data)
 		return null, false
 	}
 	return item.value, true
 }
 
 type JsonValuer[T any] struct {
-	keyer RawValuer[string]
+	valuer RawValuer[string]
 }
 
-func (k JsonValuer[T]) Set(key string, data T, ttl time.Duration) error {
+func (v JsonValuer[T]) Set(key string, data T, ttl time.Duration) error {
 	buf, err := binary.Json(data).MarshalBinary()
 	if err != nil {
 		return errors.Wrapf(err, "MarshalBinary")
 	}
-	return k.keyer.Set(key, string(buf), ttl)
+	return v.valuer.Set(key, string(buf), ttl)
 }
 
-func (k JsonValuer[T]) Get(key string) (T, bool, error) {
+func (v JsonValuer[T]) Get(key string) (T, bool, error) {
 	var null T
-	data, has := k.keyer.Get(key)
+	data, has := v.valuer.Get(key)
 	if !has {
 		return null, false, nil
 	}
@@ -75,17 +75,17 @@ type ProtobufValuer[T proto.Message] struct {
 	valuer RawValuer[string]
 }
 
-func (k ProtobufValuer[T]) Set(key string, data T, ttl time.Duration) error {
+func (v ProtobufValuer[T]) Set(key string, data T, ttl time.Duration) error {
 	buf, err := binary.Protobuf(data).MarshalBinary()
 	if err != nil {
 		return errors.Wrapf(err, "MarshalBinary")
 	}
-	return k.valuer.Set(key, string(buf), ttl)
+	return v.valuer.Set(key, string(buf), ttl)
 }
 
-func (k ProtobufValuer[T]) Get(key string) (T, bool, error) {
+func (v ProtobufValuer[T]) Get(key string) (T, bool, error) {
 	var null T
-	data, has := k.valuer.Get(key)
+	data, has := v.valuer.Get(key)
 	if !has {
 		return null, false, nil
 	}
