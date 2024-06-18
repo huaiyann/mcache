@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	gogo_proto "github.com/gogo/protobuf/proto"
 	"github.com/huaiyann/mcache/internal/pb"
 	"google.golang.org/protobuf/proto"
 )
@@ -122,17 +123,17 @@ func TestJsonValuer(t *testing.T) {
 func testProtobufValuer[T proto.Message](t *testing.T, valuer ProtobufValuer[T], key string, value T) {
 	err := valuer.Set(key, value, time.Hour)
 	if err != nil {
-		t.Errorf("testJsonValuer, key %s, got err: %v", key, err)
+		t.Errorf("testProtobufValuer, key %s, got err: %v", key, err)
 	}
 	v, has, err := valuer.Get(key)
 	if err != nil {
-		t.Errorf("testJsonValuer, key %s, got err: %v", key, err)
+		t.Errorf("testProtobufValuer, key %s, got err: %v", key, err)
 	}
 	if !has {
-		t.Errorf("testJsonValuer, key %s, has is: %v", key, has)
+		t.Errorf("testProtobufValuer, key %s, has is: %v", key, has)
 	}
-	if !reflect.DeepEqual(v, value) {
-		t.Errorf("testJsonValuer, key %s, want %v but %v", key, value, v)
+	if !proto.Equal(value, v) {
+		t.Errorf("testProtobufValuer, key %s, want %+v but %+v", key, value, v)
 	}
 }
 
@@ -141,6 +142,30 @@ func TestProtobufValuer(t *testing.T) {
 
 	var structVal = pb.PbExample{ID: 123, Value: 456}
 	testProtobufValuer(t, Protobuf[*pb.PbExample](cache), "test_pb_struct_ptr", &structVal)
+}
+
+func testProtobufGogoValuer[T gogo_proto.Message](t *testing.T, valuer ProtobufGogoValuer[T], key string, value T) {
+	err := valuer.Set(key, value, time.Hour)
+	if err != nil {
+		t.Errorf("testProtobufGogoValuer, key %s, got err: %v", key, err)
+	}
+	v, has, err := valuer.Get(key)
+	if err != nil {
+		t.Errorf("testProtobufGogoValuer, key %s, got err: %v", key, err)
+	}
+	if !has {
+		t.Errorf("testProtobufGogoValuer, key %s, has is: %v", key, has)
+	}
+	if !gogo_proto.Equal(value, v) {
+		t.Errorf("testProtobufGogoValuer, key %s, want %+v but %+v", key, value, v)
+	}
+}
+
+func TestProtobufGogoValuer(t *testing.T) {
+	cache := New()
+
+	var structVal = pb.PbExampleGogo{ID: 123, Value: 456}
+	testProtobufGogoValuer(t, ProtobufGogo[*pb.PbExampleGogo](cache), "test_pb_struct_ptr", &structVal)
 }
 
 func TestDataModifyRaw(t *testing.T) {
@@ -319,6 +344,28 @@ func TestMCacheTickExpireProtobuf(t *testing.T) {
 
 	valuer := Protobuf[*pb.PbExample](mc)
 	val := &pb.PbExample{ID: 123, Value: 456}
+	err := valuer.Set("key", val, time.Millisecond*100)
+	if err != nil {
+		t.Errorf("err is %v", err)
+	}
+	<-time.After(time.Millisecond * 300)
+	got, has, err := valuer.Get("key")
+	if err != nil {
+		t.Errorf("got error: %v", err)
+	}
+	if has {
+		t.Errorf("has is %v", has)
+	}
+	if got != nil {
+		t.Errorf("want nil but %v", got)
+	}
+}
+
+func TestMCacheTickExpireProtobufGogo(t *testing.T) {
+	mc := New()
+
+	valuer := ProtobufGogo[*pb.PbExampleGogo](mc)
+	val := &pb.PbExampleGogo{ID: 123, Value: 456}
 	err := valuer.Set("key", val, time.Millisecond*100)
 	if err != nil {
 		t.Errorf("err is %v", err)

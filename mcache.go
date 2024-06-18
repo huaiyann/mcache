@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	gogo_proto "github.com/gogo/protobuf/proto"
 	"github.com/huaiyann/mcache/internal/expire"
 	"google.golang.org/protobuf/proto"
 )
@@ -31,6 +32,10 @@ func Json[T any](cache *MCache) JsonValuer[T] {
 
 func Protobuf[T proto.Message](cache *MCache) ProtobufValuer[T] {
 	return ProtobufValuer[T]{valuer: Raw[string](cache)}
+}
+
+func ProtobufGogo[T gogo_proto.Message](cache *MCache) ProtobufGogoValuer[T] {
+	return ProtobufGogoValuer[T]{valuer: Raw[string](cache)}
 }
 
 type MCache struct {

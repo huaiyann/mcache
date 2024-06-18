@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"time"
 
+	gogo_proto "github.com/gogo/protobuf/proto"
 	"github.com/huaiyann/mcache/internal/binary"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
@@ -96,6 +97,37 @@ func (v ProtobufValuer[T]) Get(key string) (T, bool, error) {
 	target := vv.Interface().(proto.Message)
 
 	err := binary.Protobuf(target).UnmarshalBinary([]byte(data))
+	if err != nil {
+		return null, false, errors.Wrapf(err, "UnmarshalBinary")
+	}
+	return vv.Interface().(T), true, nil
+}
+
+type ProtobufGogoValuer[T gogo_proto.Message] struct {
+	valuer RawValuer[string]
+}
+
+func (v ProtobufGogoValuer[T]) Set(key string, data T, ttl time.Duration) error {
+	buf, err := binary.ProtobufGogo(data).MarshalBinary()
+	if err != nil {
+		return errors.Wrapf(err, "MarshalBinary")
+	}
+	return v.valuer.Set(key, string(buf), ttl)
+}
+
+func (v ProtobufGogoValuer[T]) Get(key string) (T, bool, error) {
+	var null T
+	data, has := v.valuer.Get(key)
+	if !has {
+		return null, false, nil
+	}
+
+	tt := reflect.TypeOf(null).Elem()
+	vv := reflect.New(tt)
+
+	target := vv.Interface().(gogo_proto.Message)
+
+	err := binary.ProtobufGogo(target).UnmarshalBinary([]byte(data))
 	if err != nil {
 		return null, false, errors.Wrapf(err, "UnmarshalBinary")
 	}
