@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/huaiyann/mcache/internal/expire"
+	"google.golang.org/protobuf/proto"
 )
 
 type cacheItemWithExpire interface {
@@ -26,6 +27,10 @@ func Raw[T comparable](cache *MCache) RawValuer[T] {
 
 func Json[T any](cache *MCache) JsonValuer[T] {
 	return JsonValuer[T]{keyer: Raw[string](cache)}
+}
+
+func Protobuf[T proto.Message](cache *MCache) ProtobufValuer[T] {
+	return ProtobufValuer[T]{valuer: Raw[string](cache)}
 }
 
 type MCache struct {

@@ -5,6 +5,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/huaiyann/mcache/internal/pb"
+	"google.golang.org/protobuf/proto"
 )
 
 func BenchmarkMcSet(b *testing.B) {
@@ -114,6 +117,30 @@ func TestJsonValuer(t *testing.T) {
 	var structVal = StructVal{Val1: 123, Val2: "123"}
 	testJsonValuer(t, Json[StructVal](cache), "test_json_struct", structVal)
 	testJsonValuer(t, Json[*StructVal](cache), "test_json_struct_ptr", &structVal)
+}
+
+func testProtobufValuer[T proto.Message](t *testing.T, valuer ProtobufValuer[T], key string, value T) {
+	err := valuer.Set(key, value, time.Hour)
+	if err != nil {
+		t.Errorf("testJsonValuer, key %s, got err: %v", key, err)
+	}
+	v, has, err := valuer.Get(key)
+	if err != nil {
+		t.Errorf("testJsonValuer, key %s, got err: %v", key, err)
+	}
+	if !has {
+		t.Errorf("testJsonValuer, key %s, has is: %v", key, has)
+	}
+	if !reflect.DeepEqual(v, value) {
+		t.Errorf("testJsonValuer, key %s, want %v but %v", key, value, v)
+	}
+}
+
+func TestProtobufValuer(t *testing.T) {
+	cache := New()
+
+	var structVal = pb.PbExample{ID: 123, Value: 456}
+	testProtobufValuer(t, Protobuf[*pb.PbExample](cache), "test_pb_struct_ptr", &structVal)
 }
 
 func TestDataModifyRaw(t *testing.T) {
@@ -271,6 +298,28 @@ func TestMCacheTickExpireJson(t *testing.T) {
 	valuer := Json[*int](mc)
 	var val int = 123
 	err := valuer.Set("key", &val, time.Millisecond*100)
+	if err != nil {
+		t.Errorf("err is %v", err)
+	}
+	<-time.After(time.Millisecond * 300)
+	got, has, err := valuer.Get("key")
+	if err != nil {
+		t.Errorf("got error: %v", err)
+	}
+	if has {
+		t.Errorf("has is %v", has)
+	}
+	if got != nil {
+		t.Errorf("want nil but %v", got)
+	}
+}
+
+func TestMCacheTickExpireProtobuf(t *testing.T) {
+	mc := New()
+
+	valuer := Protobuf[*pb.PbExample](mc)
+	val := &pb.PbExample{ID: 123, Value: 456}
+	err := valuer.Set("key", val, time.Millisecond*100)
 	if err != nil {
 		t.Errorf("err is %v", err)
 	}

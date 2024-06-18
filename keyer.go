@@ -6,6 +6,7 @@ import (
 
 	"github.com/huaiyann/mcache/internal/binary"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 type RawValuer[T comparable] struct {
@@ -68,4 +69,35 @@ func (k JsonValuer[T]) Get(key string) (T, bool, error) {
 		return null, false, errors.Wrapf(err, "UnmarshalBinary")
 	}
 	return vv.Elem().Interface().(T), true, nil
+}
+
+type ProtobufValuer[T proto.Message] struct {
+	valuer RawValuer[string]
+}
+
+func (k ProtobufValuer[T]) Set(key string, data T, ttl time.Duration) error {
+	buf, err := binary.Protobuf(data).MarshalBinary()
+	if err != nil {
+		return errors.Wrapf(err, "MarshalBinary")
+	}
+	return k.valuer.Set(key, string(buf), ttl)
+}
+
+func (k ProtobufValuer[T]) Get(key string) (T, bool, error) {
+	var null T
+	data, has := k.valuer.Get(key)
+	if !has {
+		return null, false, nil
+	}
+
+	tt := reflect.TypeOf(null).Elem()
+	vv := reflect.New(tt)
+
+	target := vv.Interface().(proto.Message)
+
+	err := binary.Protobuf(target).UnmarshalBinary([]byte(data))
+	if err != nil {
+		return null, false, errors.Wrapf(err, "UnmarshalBinary")
+	}
+	return vv.Interface().(T), true, nil
 }
